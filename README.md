@@ -1,1 +1,1 @@
-# CPS607-AMR
+# CPS607 Autonomous Mobile Robot
