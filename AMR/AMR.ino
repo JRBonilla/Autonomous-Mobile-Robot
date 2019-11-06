@@ -1,6 +1,10 @@
 #include <ServoTimer2.h>
 
+//======================================================
+// Constant variables
+//======================================================
 const int MAX_DISTANCE = 11;
+const int MAX_HEIGHT   = 20;
 const int MAX_SPEED    = 128;
 
 //======================================================
@@ -17,12 +21,12 @@ int right_motor_en   = 5;
 //=========================================================
 // Ultrasonic edge detection and object avoidance variables
 //=========================================================
-int EdgeRightEcho = A1;  // Set Right Echo port
-int EdgeRightTrig = A0;  // Set Right Trig port
+int EdgeRightEcho = A1;  // Set right Echo port
+int EdgeRightTrig = A0;  // Set right Trig port
 int EdgeRightDist = 0;
 
-int EdgeLeftEcho = A5;   // Set Left Echo port
-int EdgeLeftTrig = A4;   // Set Left Trig port
+int EdgeLeftEcho = A5;   // Set left Echo port
+int EdgeLeftTrig = A4;   // Set left Trig port
 int EdgeLeftDist = 0;
 
 int AvoidEcho = A2;      // Set front facing left echo port
@@ -90,12 +94,12 @@ void run() {
 
   digitalWrite(right_motor_go, HIGH);  // Right motor go ahead
   digitalWrite(right_motor_back, LOW);
-  analogWrite(right_motor_go, 130);    // PWM--Pulse Width Modulation (0~255). Right motor go speed is 130
+  analogWrite(right_motor_go, 130);    // PWM--Pulse Width Modulation (0~255). right motor go speed is 130
   analogWrite(right_motor_back, 0);
 
   digitalWrite(left_motor_go, HIGH);   // Left motor go ahead
   digitalWrite(left_motor_back, LOW);
-  analogWrite(left_motor_go, 130);     // PWM--Pulse Width Modulation (0~255). Left motor go speed is 130
+  analogWrite(left_motor_go, 130);     // PWM--Pulse Width Modulation (0~255). left motor go speed is 130
   analogWrite(left_motor_back, 0);
 }
 
@@ -110,15 +114,15 @@ void brake() {
 
 // Turn left
 void left() {
-  digitalWrite(right_motor_go,  HIGH);    // Right motor go ahead
-  digitalWrite(right_motor_back, LOW);
-  analogWrite(right_motor_go, MAX_SPEED); // PWM--Pulse Width Modulation(0~255) control speed, right motor go speed is 255.
-  analogWrite(right_motor_back, 0);
-
-  digitalWrite(left_motor_go,   LOW);     // Left motor stop
-  digitalWrite(left_motor_back, LOW);
-  analogWrite(left_motor_go, 0);
-  analogWrite(left_motor_back, 0);
+  digitalWrite(right_motor_go,HIGH);  // Right motor go ahead
+  digitalWrite(right_motor_back,LOW);
+  analogWrite(right_motor_go,190);    // PWM--Pulse Width Modulation(0~255) control speed，right motor go speed is 255.
+  analogWrite(right_motor_back,0);
+  digitalWrite(left_motor_go,LOW);    // Left motor stop
+  digitalWrite(left_motor_back,LOW); 
+  analogWrite(left_motor_go,0); 
+  analogWrite(left_motor_back,0);
+ //delay(time * 100); 
 }
 
 // Rotate left
@@ -138,15 +142,15 @@ void spin_left(int time) {
 
 // Turn right
 void right() {
-  digitalWrite(right_motor_go,   LOW);   // Right motor stop
-  digitalWrite(right_motor_back, LOW);
-  analogWrite(right_motor_go,   0);
-  analogWrite(right_motor_back, 0);
-
-  digitalWrite(left_motor_go,  HIGH);    // Left motor go ahead
-  digitalWrite(left_motor_back, LOW);
-  analogWrite(left_motor_go, MAX_SPEED); // PWM--Pulse Width Modulation(0~255) control speed, left motor go speed is 230.
-  analogWrite(left_motor_back, 0);
+  digitalWrite(right_motor_go,LOW);   // Right motor stop
+  digitalWrite(right_motor_back,LOW);
+  analogWrite(right_motor_go,0); 
+  analogWrite(right_motor_back,0);
+  digitalWrite(left_motor_go,HIGH);   // Left motor go ahead
+  digitalWrite(left_motor_back,LOW);
+  analogWrite(left_motor_go,230);     // PWM--Pulse Width Modulation(0~255) control speed ,left motor go speed is 255.
+  analogWrite(left_motor_back,0);
+  delay(150);
 }
 
 // Rotate right
@@ -191,8 +195,8 @@ void Edge_right_distance_test() {
   Fdistance= Fdistance/58;                        // Distance(m) =(time(s) * 344(m/s)) / 2     /****** The speed of sound is 344m/s.*******/
                                                   //  ==> 2*Distance(cm) = time(μs) * 0.0344(cm/μs)
                                                   //  ==> Distance(cm) = time(μs) * 0.0172 = time(μs) / 58
-  Serial.print("Edge Right Distance:");           // Output Distance(cm)
-  Serial.println(Fdistance);                      // Display distance
+  //Serial.print("Edge right Distance:");           // Output Distance(cm)
+  //Serial.println(Fdistance);                      // Display distance
   EdgeRightDist = Fdistance;
 }  
 
@@ -207,8 +211,8 @@ void Edge_left_distance_test() {
   Fdistance= Fdistance/58;                       // Distance(m) =(time(s) * 344(m/s)) / 2     /****** The speed of sound is 344m/s.*******/
                                                  //  ==> 2*Distance(cm) = time(μs) * 0.0344(cm/μs)
                                                  //  ==> Distance(cm) = time(μs) * 0.0172 = time(μs) / 58
-  Serial.print("Edge Left Distance:");           // Output Distance(cm)
-  Serial.println(Fdistance);                     // Display distance
+  //Serial.print("Edge left Distance:");           // Output Distance(cm)
+  //Serial.println(Fdistance);                     // Display distance
   EdgeLeftDist = Fdistance;
 }  
 
@@ -223,8 +227,8 @@ void Avoid_distance_test() {
   Fdistance= Fdistance/58;                    // Distance(m) =(time(s) * 344(m/s)) / 2     /****** The speed of sound is 344m/s.*******/
                                               //  ==> 2*Distance(cm) = time(μs) * 0.0344(cm/μs)
                                               //  ==> Distance(cm) = time(μs) * 0.0172 = time(μs) / 58
-  Serial.print("Avoid Distance:");            // Output Distance(cm)
-  Serial.println(Fdistance);                  // Display distance
+  //Serial.print("Avoid Distance:");            // Output Distance(cm)
+  //Serial.println(Fdistance);                  // Display distance
   AvoidDist = Fdistance;
 }
 
@@ -248,15 +252,15 @@ void EdgeCheck(){
     Edge_right_distance_test(); // Measuring right ultrasonic distance
     Edge_left_distance_test();  // Measuring left ultrasonic distance
     
-    if (EdgeRightDist > 20 && EdgeLeftDist > 20) {  // Both out of bounds
+    if (EdgeRightDist > MAX_HEIGHT && EdgeLeftDist > MAX_HEIGHT) {  // Both are out of bounds
       back(2);
       spin_right(6);
     }
-    if (EdgeRightDist < 20 && EdgeLeftDist > 20) {  // Right is out of bounds
+    if (EdgeRightDist < MAX_HEIGHT && EdgeLeftDist > MAX_HEIGHT) {  // Right is out of bounds
       back(2);
       spin_left(6);
     }
-    if (EdgeRightDist > 20 && EdgeLeftDist < 20) {  // Left is out of bounds
+    if (EdgeRightDist > MAX_HEIGHT && EdgeLeftDist < MAX_HEIGHT) {  // Left is out of bounds
       back(2);
       spin_right(6);
     }
@@ -290,78 +294,46 @@ void loop() {
   while (true) {
     Avoid_distance_test();
     
-    SR = digitalRead(IRSensorRight);
-    SL = digitalRead(IRSensorLeft);
-    
-    // Brake check
-    for (int i = 750; i <= 1925; i+= 375){
+    // Servo code
+    for (int i = 375; i <= 1925; i+= 375){
       servo.write(i);
       brake();
-      delay(500);
+      delay(100);
       EdgeCheck();
       if (isObjectInFront()) { // There is an object in front of the robot.
-        if (i <= 1500){
+        if (i <= 1500){        // The sensor is facing the right.
           spin_left(5);
         } else {
-          spin_right(5);
+          spin_right(5);       // The sensor is facing the left.
         }
-        i=375;
+        i=375;                 // Reset the servo position.
       }
     }
     
     Edge_right_distance_test(); // Measuring right ultrasonic distance
     Edge_left_distance_test();  // Measuring left ultrasonic distance
-
-    /*
-    if (S == HIGH && EdgeRightDist < 20 && EdgeLeftDist < 20) {
+    
+    // Black line following code
+    SL = digitalRead(IRSensorLeft);    
+    SR = digitalRead(IRSensorRight);
+    if (SL == LOW && SR == LOW && EdgeRightDist < 20 && EdgeLeftDist < 20) { // No black lines detected
       run();
-      delay(150);
+      delay(60);
       brake();
       delay(100);
-      
-      S = digitalRead(blackLineSensor);
-      if (S == LOW){
-        spin_right(4);
-        S = digitalRead(blackLineSensor);
-        if (S= LOW) {
-          
-        spin_left(8);
-        }
-      
-      }
-    }*/
-
-    // Black line following code
-    if (SL == LOW && SR == LOW) {       // No black lines detected
-      run();
     }
-    else if (SL == LOW && SR == HIGH) { // Left sensor against white undersurface and right against black undersurface, the car left off track and need to adjust to the right.
+    else if (SL == LOW && SR == HIGH) {                                     // Black line detected on the right, turn right
       right();
     }
-    else if (SL == HIGH && SR == LOW) { // Right sensor against white undersurface and left against black undersurface, the car right off track and need to adjust to the left.
-      left();
+    else if (SL == HIGH && SR == LOW) {                                     // Black line detected on the left, turn left
+      spin_left(1);
     }
-    
-    // Ultrasonic edge detection
-    if (EdgeRightDist < 20 && EdgeLeftDist < 20) {  // There is no obstacle, goes ahead.
-      run();
-      delay(150);
-      brake();
-      delay(100);
-    }
-    if (EdgeRightDist > 20 && EdgeLeftDist > 20) {  // Both out of bounds
-      back(2);
-      spin_right(6);
-    }
-    if (EdgeRightDist < 20 && EdgeLeftDist > 20) {  // Right is out of bounds
-      back(2);
-      spin_left(6);
-    }
-    if (EdgeRightDist > 20 && EdgeLeftDist < 20) {  // Left is out of bounds
-      back(2);
-      spin_right(6);  
+    else if (SL == HIGH && SR == HIGH &&
+        EdgeRightDist < MAX_HEIGHT && EdgeLeftDist < MAX_HEIGHT) {          // Black line detected on both left and right, turn right
+      right();
     }
 
+    EdgeCheck();
   }
 
 }
