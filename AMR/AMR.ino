@@ -52,6 +52,8 @@ int buttonPin = 13;
 // Set BUZZER port
 int beep = 12;
 
+bool isOnPlatform = (EdgeRightDist < MAX_HEIGHT && EdgeLeftDist < MAX_HEIGHT);
+
 // Initial setup code
 void setup() {
   // Begin serial output
@@ -316,21 +318,20 @@ void loop() {
     // Black line following code
     SL = digitalRead(IRSensorLeft);    
     SR = digitalRead(IRSensorRight);
-    if (SL == LOW && SR == LOW && EdgeRightDist < 20 && EdgeLeftDist < 20) { // No black lines detected
+    if (SL == LOW && SR == LOW && isOnPlatform) {        // No black lines detected
       run();
       delay(60);
       brake();
       delay(100);
     }
-    else if (SL == LOW && SR == HIGH) {                                     // Black line detected on the right, turn right
+    else if (SL == LOW && SR == HIGH) {                  // Black line detected on the right, turn right
       right();
     }
-    else if (SL == HIGH && SR == LOW) {                                     // Black line detected on the left, turn left
+    else if (SL == HIGH && SR == LOW) {                  // Black line detected on the left, turn left
       spin_left(1);
     }
-    else if (SL == HIGH && SR == HIGH &&
-        EdgeRightDist < MAX_HEIGHT && EdgeLeftDist < MAX_HEIGHT) {          // Black line detected on both left and right, turn right
-      right();
+    else if (SL == HIGH && SR == HIGH && isOnPlatform) { // Black line detected on both left and right, turn right
+      spin_left(3);
     }
 
     EdgeCheck();
