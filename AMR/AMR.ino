@@ -10,13 +10,13 @@ const int MAX_SPEED    = 128;
 //======================================================
 // Motor variables
 //======================================================
-int left_motor_en    = 10;
-int left_motor_back  = 9;
-int left_motor_go    = 8;
+int left_motor_en    = 10; // Pin D10
+int left_motor_back  = 9;  // Pin D9
+int left_motor_go    = 8;  // Pin D8
 
-int right_motor_back = 7;
-int right_motor_go   = 6;
-int right_motor_en   = 5;
+int right_motor_back = 7;  // Pin D7
+int right_motor_go   = 6;  // Pin D6
+int right_motor_en   = 5;  // Pin D5
 
 //=========================================================
 // Ultrasonic edge detection and object avoidance variables
@@ -29,15 +29,15 @@ int EdgeLeftEcho = A5;   // Set left Echo port
 int EdgeLeftTrig = A4;   // Set left Trig port
 int EdgeLeftDist = 0;
 
-int AvoidEcho = A2;      // Set front facing left echo port
-int AvoidTrig = A3;      // Set front facing left trig port
+int AvoidEcho = A2;      // Set front facing echo port
+int AvoidTrig = A3;      // Set front facing trig port
 int AvoidDist = 0;
 
 //=========================================================
 // Servo variables
 //=========================================================
-int servoPort = 0;  // Servo port
-ServoTimer2 servo;  // Servo 
+int ServoPort = 0;  // Servo port
+ServoTimer2 servo;  // Servo
 
 //=========================================================
 // IR sensor variables
@@ -46,11 +46,17 @@ const int IRSensorRight = 1;  // IR sensor right port (D1)
 const int IRSensorLeft  = 11; // IR sensor left port (D11)
 int SL, SR;                   // IR sensor states
 
-// Set button port
+//=========================================================
+// Flame sensor variables
+//=========================================================
+int FlameSensorPin = 4; // Flame sensor port
+int FlameSensorVal;     // Flame sensor value
+
+// Set button port (D13)
 int buttonPin = 13;
 
-// Set BUZZER port
-int beep = 12;
+// Set buzzer port (D12)
+int buzzerPin = 12;
 
 bool isOnPlatform = (EdgeRightDist < MAX_HEIGHT && EdgeLeftDist < MAX_HEIGHT);
 
@@ -59,7 +65,7 @@ void setup() {
   // Begin serial output
   //Serial.begin(9600); // Do not uncomment this unless you want debugging and aren't using D0 and/or D1
   
-  // Initialize left motor drive for output mode.
+  // Initialize left and right motor drive for output mode.
   pinMode(left_motor_go,    OUTPUT);
   pinMode(left_motor_back,  OUTPUT);
   pinMode(right_motor_go,   OUTPUT);
@@ -68,7 +74,7 @@ void setup() {
   pinMode(left_motor_en,    OUTPUT);
 
   pinMode(buttonPin, INPUT);       // Set button as input
-  //pinMode(beep, OUTPUT);         // Set buzzer as output
+  //pinMode(beep, OUTPUT);           // Set buzzer as output
 
   pinMode(EdgeRightEcho, INPUT);   // Set Echo port mode
   pinMode(EdgeRightTrig, OUTPUT);  // Set Trig port mode
@@ -79,13 +85,15 @@ void setup() {
   pinMode(AvoidEcho, INPUT);       // Set Echo port mode
   pinMode(AvoidTrig, OUTPUT);      // Set Trig port mode
 
-  servo.attach(servoPort);
+  servo.attach(ServoPort);         // Attach the servo to the servo port
 
   digitalWrite(buttonPin, HIGH);   // Initialize button
-  digitalWrite(beep, LOW);         // Set buzzer mute
+  //digitalWrite(buzzerPin, LOW);    // Set buzzer mute
 
   pinMode(IRSensorRight, INPUT);   // Set right Line Walking IR sensor as input
   pinMode(IRSensorLeft,  INPUT);   // Set left Line Walking IR sensor as input
+
+  //pinMode(FlameSensorPin, INPUT_PULLUP); // Set flame sensor as input
 }
 
 // Move forward
@@ -116,15 +124,16 @@ void brake() {
 
 // Turn left
 void left() {
-  digitalWrite(right_motor_go,HIGH);  // Right motor go ahead
-  digitalWrite(right_motor_back,LOW);
-  analogWrite(right_motor_go,190);    // PWM--Pulse Width Modulation(0~255) control speed，right motor go speed is 255.
-  analogWrite(right_motor_back,0);
-  digitalWrite(left_motor_go,LOW);    // Left motor stop
-  digitalWrite(left_motor_back,LOW); 
-  analogWrite(left_motor_go,0); 
-  analogWrite(left_motor_back,0);
- //delay(time * 100); 
+  digitalWrite(right_motor_go, HIGH);  // Right motor go ahead
+  digitalWrite(right_motor_back, LOW);
+  analogWrite(right_motor_go, 190);    // PWM--Pulse Width Modulation(0~255) control speed，right motor go speed is 190.
+  analogWrite(right_motor_back, 0);
+  
+  digitalWrite(left_motor_go, LOW);    // Left motor stop
+  digitalWrite(left_motor_back, LOW); 
+  analogWrite(left_motor_go, 0); 
+  analogWrite(left_motor_back, 0);
+  delay(150); 
 }
 
 // Rotate left
@@ -144,14 +153,15 @@ void spin_left(int time) {
 
 // Turn right
 void right() {
-  digitalWrite(right_motor_go,LOW);   // Right motor stop
-  digitalWrite(right_motor_back,LOW);
-  analogWrite(right_motor_go,0); 
-  analogWrite(right_motor_back,0);
-  digitalWrite(left_motor_go,HIGH);   // Left motor go ahead
-  digitalWrite(left_motor_back,LOW);
-  analogWrite(left_motor_go,230);     // PWM--Pulse Width Modulation(0~255) control speed ,left motor go speed is 255.
-  analogWrite(left_motor_back,0);
+  digitalWrite(right_motor_go, LOW);   // Right motor stop
+  digitalWrite(right_motor_back, LOW);
+  analogWrite(right_motor_go, 0); 
+  analogWrite(right_motor_back, 0);
+  
+  digitalWrite(left_motor_go, HIGH);   // Left motor go ahead
+  digitalWrite(left_motor_back, LOW);
+  analogWrite(left_motor_go, 230);     // PWM--Pulse Width Modulation(0~255) control speed ,left motor go speed is 230.
+  analogWrite(left_motor_back, 0);
   delay(150);
 }
 
@@ -187,7 +197,7 @@ void back(int time) {
 }
 
 // Right ultrasonic sensor distance test
-void Edge_right_distance_test() {
+void EdgeRightDistanceTest() {
   digitalWrite(EdgeRightTrig, LOW);               // Set trig port low level for 2μs
   delayMicroseconds(2);
   digitalWrite(EdgeRightTrig, HIGH);              // Set trig port high level for 10μs(at least 10μs)
@@ -203,7 +213,7 @@ void Edge_right_distance_test() {
 }  
 
 // Left ultrasonic sensor distance test
-void Edge_left_distance_test() {
+void EdgeLeftDistanceTest() {
   digitalWrite(EdgeLeftTrig, LOW);               // Set trig port low level for 2μs
   delayMicroseconds(2);
   digitalWrite(EdgeLeftTrig, HIGH);              // Set trig port high level for 10μs(at least 10μs)
@@ -219,7 +229,7 @@ void Edge_left_distance_test() {
 }  
 
 // Object avoidance sensor distance test
-void Avoid_distance_test() {
+void AvoidDistanceTest() {
   digitalWrite(AvoidTrig, LOW);               // Set trig port low level for 2μs
   delayMicroseconds(2);
   digitalWrite(AvoidTrig, HIGH);              // Set trig port high level for 10μs(at least 10μs)
@@ -236,12 +246,12 @@ void Avoid_distance_test() {
 
 // Returns whether or not the object avoidance sensor detected an object
 boolean isObjectInFront(){
-    Avoid_distance_test(); // Check the avoidance sensor distance once.
+    AvoidDistanceTest(); // Check the avoidance sensor distance once.
 
     int old = AvoidDist;   // Save the prior result and wait 250 ms before the next test.
     delay(250);
     
-    Avoid_distance_test(); // Check the avoidance sensor distance again.
+    AvoidDistanceTest(); // Check the avoidance sensor distance again.
     
     // If both checks are less than MAX_DISTANCE then there is something in front
     if (AvoidDist < MAX_DISTANCE && old < MAX_DISTANCE ) {
@@ -250,9 +260,10 @@ boolean isObjectInFront(){
     return false;
 }
 
+// Edge detection code
 void EdgeCheck(){
-    Edge_right_distance_test(); // Measuring right ultrasonic distance
-    Edge_left_distance_test();  // Measuring left ultrasonic distance
+    EdgeRightDistanceTest(); // Measuring right ultrasonic distance
+    EdgeLeftDistanceTest();  // Measuring left ultrasonic distance
     
     if (EdgeRightDist > MAX_HEIGHT && EdgeLeftDist > MAX_HEIGHT) {  // Both are out of bounds
       back(2);
@@ -278,23 +289,27 @@ void keyscan() {
     delay(10); // delay 10ms
     val = digitalRead(buttonPin);       // Read
     if (val == LOW) {                   // Double check the button is pressed
-      digitalWrite(beep, HIGH);
+      digitalWrite(buzzerPin, HIGH);
       delay(50);                        // Delay 50ms
       while (!digitalRead(buttonPin)) { // Determine if button is released or not
-        digitalWrite(beep, LOW);        // Mute
+        digitalWrite(buzzerPin, LOW);   // Mute
       }
     }
     else {
-      digitalWrite(beep, LOW);          // Mute
+      digitalWrite(buzzerPin, LOW);     // Mute
     }
   }
+}
+
+void FlameSensorCheck() {
+  FlameSensorVal = analogRead(FlameSensorPin);
 }
 
 void loop() {
   keyscan(); // Press the button to start
  
   while (true) {
-    Avoid_distance_test();
+    AvoidDistanceTest();
     
     // Servo code
     for (int i = 375; i <= 1925; i+= 375){
@@ -312,12 +327,12 @@ void loop() {
       }
     }
     
-    Edge_right_distance_test(); // Measuring right ultrasonic distance
-    Edge_left_distance_test();  // Measuring left ultrasonic distance
+    EdgeRightDistanceTest(); // Measuring right ultrasonic distance
+    EdgeLeftDistanceTest();  // Measuring left ultrasonic distance
     
     // Black line following code
-    SL = digitalRead(IRSensorLeft);    
-    SR = digitalRead(IRSensorRight);
+    SL = digitalRead(IRSensorLeft);  // Read left IR sensor state
+    SR = digitalRead(IRSensorRight); // Read right IR sensor state
     if (SL == LOW && SR == LOW && isOnPlatform) {        // No black lines detected
       run();
       delay(60);
