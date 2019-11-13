@@ -1,15 +1,19 @@
 #include <ServoTimer2.h>
 
-//======================================================
+//========================================================
 // Constant variables
-//======================================================
-const int MAX_DISTANCE = 11;
-const int MAX_HEIGHT   = 20;
-const int MAX_SPEED    = 128;
+//========================================================
+const int LIGHT_THRESHOLD = 100;
+const int MAX_DISTANCE    = 11;
+const int MAX_HEIGHT      = 20;
+const int MAX_SPEED       = 128;
 
-//======================================================
-// Motor variables
-//======================================================
+//========================================================
+// Motor & other variables
+//========================================================
+int buttonPin        = 13; // Pin D13
+int buzzerPin        = 12; // Pin D12
+
 int left_motor_en    = 10; // Pin D10
 int left_motor_back  = 9;  // Pin D9
 int left_motor_go    = 8;  // Pin D8
@@ -33,6 +37,9 @@ int AvoidEcho = A2;      // Set front facing echo port
 int AvoidTrig = A3;      // Set front facing trig port
 int AvoidDist = 0;
 
+// Returns whether or not both edge sensors are currently not off the edge.
+bool isOnPlatform = (EdgeRightDist < MAX_HEIGHT && EdgeLeftDist < MAX_HEIGHT);
+
 //=========================================================
 // Servo variables
 //=========================================================
@@ -47,23 +54,15 @@ const int IRSensorLeft  = 11; // IR sensor left port (D11)
 int SL, SR;                   // IR sensor states
 
 //=========================================================
-// Flame sensor variables
+// Light sensor variables
 //=========================================================
-int FlameSensorPin = 4; // Flame sensor port
-int FlameSensorVal;     // Flame sensor value
-
-// Set button port (D13)
-int buttonPin = 13;
-
-// Set buzzer port (D12)
-int buzzerPin = 12;
-
-bool isOnPlatform = (EdgeRightDist < MAX_HEIGHT && EdgeLeftDist < MAX_HEIGHT);
+int LightSensorPin = A0; // Light sensor port
+int LightSensorVal;      // Light sensor value
 
 // Initial setup code
 void setup() {
   // Begin serial output
-  //Serial.begin(9600); // Do not uncomment this unless you want debugging and aren't using D0 and/or D1
+  Serial.begin(9600); // Do not uncomment this unless you want debugging and aren't using D0 and/or D1
   
   // Initialize left and right motor drive for output mode.
   pinMode(left_motor_go,    OUTPUT);
@@ -74,7 +73,7 @@ void setup() {
   pinMode(left_motor_en,    OUTPUT);
 
   pinMode(buttonPin, INPUT);       // Set button as input
-  //pinMode(beep, OUTPUT);           // Set buzzer as output
+  //pinMode(beep, OUTPUT);         // Set buzzer as output
 
   pinMode(EdgeRightEcho, INPUT);   // Set Echo port mode
   pinMode(EdgeRightTrig, OUTPUT);  // Set Trig port mode
@@ -88,12 +87,12 @@ void setup() {
   servo.attach(ServoPort);         // Attach the servo to the servo port
 
   digitalWrite(buttonPin, HIGH);   // Initialize button
-  //digitalWrite(buzzerPin, LOW);    // Set buzzer mute
+  //digitalWrite(buzzerPin, LOW);  // Set buzzer mute
 
   pinMode(IRSensorRight, INPUT);   // Set right Line Walking IR sensor as input
   pinMode(IRSensorLeft,  INPUT);   // Set left Line Walking IR sensor as input
 
-  //pinMode(FlameSensorPin, INPUT_PULLUP); // Set flame sensor as input
+  pinMode(LightSensorPin, INPUT);  // Set lightsensor as input
 }
 
 // Move forward
@@ -301,14 +300,25 @@ void keyscan() {
   }
 }
 
-void FlameSensorCheck() {
-  FlameSensorVal = analogRead(FlameSensorPin);
+// Returns whether or not there is a candle in front of the robot.
+boolean isCandlePresent() {
+  LightSensorVal = analogRead(LightSensorPin);
+
+  if (LightSensorVal < LIGHT_THRESHOLD) {
+    Serial.print("Candle is present: ");
+    Serial.println(LightSensorVal);
+    return true;
+  }
+  Serial.print("No candle present: ");
+  Serial.println(LightSensorVal);
+  return false;
 }
 
 void loop() {
   keyscan(); // Press the button to start
  
   while (true) {
+    isCandlePresent();
     AvoidDistanceTest();
     
     // Servo code
@@ -320,7 +330,8 @@ void loop() {
       if (isObjectInFront()) { // There is an object in front of the robot.
         if (i <= 1500){        // The sensor is facing the right.
           spin_left(5);
-        } else {
+        }
+        else {
           spin_right(5);       // The sensor is facing the left.
         }
         i=375;                 // Reset the servo position.
