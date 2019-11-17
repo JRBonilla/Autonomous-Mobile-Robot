@@ -3,10 +3,15 @@
 //========================================================
 // Constant variables
 //========================================================
-const int LIGHT_THRESHOLD = 100;
+const int LIGHT_THRESHOLD = 500;
 const int MAX_DISTANCE    = 11;
 const int MAX_HEIGHT      = 20;
 const int MAX_SPEED       = 128;
+
+const int INIT_POSITION   = 375;
+const int FINAL_POSITION  = 1925;
+const int MIDDLE_POSITION = 1500;
+const int NUM_POSITIONS   = 4;
 
 //========================================================
 // Motor & other variables
@@ -26,7 +31,7 @@ int right_motor_en   = 5;  // Pin D5
 // Ultrasonic edge detection and object avoidance variables
 //=========================================================
 int EdgeRightEcho = A1;  // Set right Echo port
-int EdgeRightTrig = A0;  // Set right Trig port
+int EdgeRightTrig = 4;   // Set right Trig port
 int EdgeRightDist = 0;
 
 int EdgeLeftEcho = A5;   // Set left Echo port
@@ -37,8 +42,11 @@ int AvoidEcho = A2;      // Set front facing echo port
 int AvoidTrig = A3;      // Set front facing trig port
 int AvoidDist = 0;
 
-// Returns whether or not both edge sensors are currently not off the edge.
-bool isOnPlatform = (EdgeRightDist < MAX_HEIGHT && EdgeLeftDist < MAX_HEIGHT);
+// Returns whether or not the edge sensors are currently off the edge.
+bool isLeftOOB    = (EdgeRightDist < MAX_HEIGHT && EdgeLeftDist > MAX_HEIGHT); // Left sensor out of bounds
+bool isRightOOB   = (EdgeRightDist > MAX_HEIGHT && EdgeLeftDist < MAX_HEIGHT); // Right sensor out of bounds
+bool isBothOOB    = (EdgeRightDist > MAX_HEIGHT && EdgeLeftDist > MAX_HEIGHT); // Both sensors out of bounds
+bool isOnPlatform = (EdgeRightDist < MAX_HEIGHT && EdgeLeftDist < MAX_HEIGHT); // Neither sensor out of bounds
 
 //=========================================================
 // Servo variables
@@ -56,13 +64,14 @@ int SL, SR;                   // IR sensor states
 //=========================================================
 // Light sensor variables
 //=========================================================
-int LightSensorPin = A0; // Light sensor port
-int LightSensorVal;      // Light sensor value
+int LightSensorPin = A0;              // Light sensor port
+int LightSensorVal = 0;               // Current light sensor value
+int LightSensorValues[NUM_POSITIONS]; // Light sensor values for the different servo positions
 
 // Initial setup code
 void setup() {
   // Begin serial output
-  Serial.begin(9600); // Do not uncomment this unless you want debugging and aren't using D0 and/or D1
+  //Serial.begin(9600); // Do not uncomment this unless you want debugging and aren't using D0 and/or D1
   
   // Initialize left and right motor drive for output mode.
   pinMode(left_motor_go,    OUTPUT);
@@ -247,7 +256,7 @@ void AvoidDistanceTest() {
 boolean isObjectInFront(){
     AvoidDistanceTest(); // Check the avoidance sensor distance once.
 
-    int old = AvoidDist;   // Save the prior result and wait 250 ms before the next test.
+    int old = AvoidDist; // Save the prior result and wait 250 ms before the next test.
     delay(250);
     
     AvoidDistanceTest(); // Check the avoidance sensor distance again.
@@ -278,6 +287,50 @@ void EdgeCheck(){
     }
 }
 
+// Store the light sensor value based on the current servo position.
+void StoreLightSensorValue(int pos) {
+  LightSensorVal = analogRead(LightSensorPin);
+  if (pos <= NUM_POSITIONS) {
+    LightSensorValues[pos] = LightSensorVal;
+  }
+}
+
+// Go in the direction with the brightest light
+void ChoosePath() {
+  // Find the brightest direction
+  int minimum = LightSensorValues[0];
+  for (int i = 0; i < NUM_POSITIONS; i++) {
+    if (LightSensorValues[i] < minimum) {
+      minimum = LightSensorValues[i];
+    }
+  }
+
+  switch (minimum) {
+    case 0:  // Brightest direction is on the right
+      break;
+    case 1:  // Brightest direction is 
+      break;
+    case 2:  // Brightest direction is 
+      break;
+    case 3:  // Brightest direction is on the left
+      break;
+  }
+}
+
+// Returns whether or not there is a candle in front of the robot.
+boolean isCandlePresent() {
+  LightSensorVal = analogRead(LightSensorPin);
+
+  if (LightSensorVal < LIGHT_THRESHOLD) {
+    Serial.print("Candle is present: ");
+    Serial.println(LightSensorVal);
+    return true;
+  }
+  Serial.print("No candle present: ");
+  Serial.println(LightSensorVal);
+  return false;
+}
+
 // Check for button press
 void keyscan() {
   int val = digitalRead(buttonPin);     // Reads the button, the level value assigns to val.
@@ -300,48 +353,37 @@ void keyscan() {
   }
 }
 
-// Returns whether or not there is a candle in front of the robot.
-boolean isCandlePresent() {
-  LightSensorVal = analogRead(LightSensorPin);
-
-  if (LightSensorVal < LIGHT_THRESHOLD) {
-    Serial.print("Candle is present: ");
-    Serial.println(LightSensorVal);
-    return true;
-  }
-  Serial.print("No candle present: ");
-  Serial.println(LightSensorVal);
-  return false;
-}
-
 void loop() {
   keyscan(); // Press the button to start
- 
   while (true) {
-    isCandlePresent();
-    AvoidDistanceTest();
-    
-    // Servo code
-    for (int i = 375; i <= 1925; i+= 375){
+    // Object avoidance code
+    int servoPosition = 0;         // Tracks servo position
+    for (int i = INIT_POSITION; i <= FINAL_POSITION; i += 375){
       servo.write(i);
       brake();
       delay(100);
+      
       EdgeCheck();
-      if (isObjectInFront()) { // There is an object in front of the robot.
-        if (i <= 1500){        // The sensor is facing the right.
+      StoreLightSensorValue(servoPosition);
+      
+      if (isObjectInFront()) {     // There is an object in front of the robot.
+        if (i <= MIDDLE_POSITION){ // The sensor is facing the right.
           spin_left(5);
         }
         else {
-          spin_right(5);       // The sensor is facing the left.
+          spin_right(5);           // The sensor is facing the left.
         }
-        i=375;                 // Reset the servo position.
+        i = INIT_POSITION;         // Reset the servo position.
+        servoPosition = 0;         // Reset the position tracker.
+        //ChoosePath();
       }
+      servoPosition++;
     }
     
+    // Black line following code
     EdgeRightDistanceTest(); // Measuring right ultrasonic distance
     EdgeLeftDistanceTest();  // Measuring left ultrasonic distance
     
-    // Black line following code
     SL = digitalRead(IRSensorLeft);  // Read left IR sensor state
     SR = digitalRead(IRSensorRight); // Read right IR sensor state
     if (SL == LOW && SR == LOW && isOnPlatform) {        // No black lines detected
@@ -360,6 +402,7 @@ void loop() {
       spin_left(3);
     }
 
+    // Edge detection
     EdgeCheck();
   }
 
