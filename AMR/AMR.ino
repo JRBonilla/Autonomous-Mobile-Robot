@@ -71,7 +71,7 @@ int LightSensorValues[NUM_POSITIONS]; // Light sensor values for the different s
 // Initial setup code
 void setup() {
   // Begin serial output
-  //Serial.begin(9600); // Do not uncomment this unless you want debugging and aren't using D0 and/or D1
+  Serial.begin(9600); // Do not uncomment this unless you want debugging and aren't using D0 and/or D1
   
   // Initialize left and right motor drive for output mode.
   pinMode(left_motor_go,    OUTPUT);
@@ -290,7 +290,7 @@ void EdgeCheck(){
 // Store the light sensor value based on the current servo position.
 void StoreLightSensorValue(int pos) {
   LightSensorVal = analogRead(LightSensorPin);
-  if (pos <= NUM_POSITIONS) {
+  if (pos < NUM_POSITIONS) {
     LightSensorValues[pos] = LightSensorVal;
   }
 }
