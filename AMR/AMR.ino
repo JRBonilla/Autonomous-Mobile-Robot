@@ -1,17 +1,21 @@
 #include <ServoTimer2.h>
 
+#define STEP_FORWARD() run(); delay(60); brake(); delay(100);
+
 //========================================================
 // Constant variables
 //========================================================
-const int LIGHT_THRESHOLD = 500;
-const int MAX_DISTANCE    = 11;
-const int MAX_HEIGHT      = 20;
-const int MAX_SPEED       = 128;
+const int LIGHT_THRESHOLD  = 570;
+const int FOLLOW_THRESHOLD = 750;
 
-const int INIT_POSITION   = 375;
-const int FINAL_POSITION  = 1925;
-const int MIDDLE_POSITION = 1500;
-const int NUM_POSITIONS   = 4;
+const int MAX_DISTANCE     = 11;
+const int MAX_HEIGHT       = 20;
+const int MAX_SPEED        = 128;
+
+const int INIT_POSITION    = 375;
+const int FINAL_POSITION   = 1925;
+const int MIDDLE_POSITION  = 1500;
+const int NUM_POSITIONS    = 4;
 
 //========================================================
 // Motor & other variables
@@ -30,16 +34,16 @@ int right_motor_en   = 5;  // Pin D5
 //=========================================================
 // Ultrasonic edge detection and object avoidance variables
 //=========================================================
-int EdgeRightEcho = A1;  // Set right Echo port
-int EdgeRightTrig = 4;   // Set right Trig port
+int EdgeRightEcho = A1; // Set right Echo port
+int EdgeRightTrig = 4;  // Set right Trig port
 int EdgeRightDist = 0;
 
-int EdgeLeftEcho = A5;   // Set left Echo port
-int EdgeLeftTrig = A4;   // Set left Trig port
+int EdgeLeftEcho = A5;  // Set left Echo port
+int EdgeLeftTrig = A4;  // Set left Trig port
 int EdgeLeftDist = 0;
 
-int AvoidEcho = A2;      // Set front facing echo port
-int AvoidTrig = A3;      // Set front facing trig port
+int AvoidEcho = A2;     // Set front facing echo port
+int AvoidTrig = A3;     // Set front facing trig port
 int AvoidDist = 0;
 
 // Returns whether or not the edge sensors are currently off the edge.
@@ -64,14 +68,14 @@ int SL, SR;                   // IR sensor states
 //=========================================================
 // Light sensor variables
 //=========================================================
-int LightSensorPin = A0;              // Light sensor port
-int LightSensorVal = 0;               // Current light sensor value
-int LightSensorValues[NUM_POSITIONS]; // Light sensor values for the different servo positions
+int LightSensorPin = A0;                   // Light sensor port
+int LightSensorVal = 0;                    // Current light sensor value
+int LightSensorValues[NUM_POSITIONS] = {}; // Light sensor values for the different servo positions
 
 // Initial setup code
 void setup() {
   // Begin serial output
-  Serial.begin(9600); // Do not uncomment this unless you want debugging and aren't using D0 and/or D1
+  //Serial.begin(9600); // Do not uncomment this unless you want debugging and aren't using D0 and/or D1
   
   // Initialize left and right motor drive for output mode.
   pinMode(left_motor_go,    OUTPUT);
@@ -83,6 +87,8 @@ void setup() {
 
   pinMode(buttonPin, INPUT);       // Set button as input
   //pinMode(beep, OUTPUT);         // Set buzzer as output
+
+  pinMode(LightSensorPin, INPUT);  // Set light sensor as input
 
   pinMode(EdgeRightEcho, INPUT);   // Set Echo port mode
   pinMode(EdgeRightTrig, OUTPUT);  // Set Trig port mode
@@ -100,8 +106,6 @@ void setup() {
 
   pinMode(IRSensorRight, INPUT);   // Set right Line Walking IR sensor as input
   pinMode(IRSensorLeft,  INPUT);   // Set left Line Walking IR sensor as input
-
-  pinMode(LightSensorPin, INPUT);  // Set lightsensor as input
 }
 
 // Move forward
@@ -288,7 +292,7 @@ void EdgeCheck(){
 }
 
 // Store the light sensor value based on the current servo position.
-void StoreLightSensorValue(int pos) {
+void StoreLightValue(int pos) {
   LightSensorVal = analogRead(LightSensorPin);
   if (pos < NUM_POSITIONS) {
     LightSensorValues[pos] = LightSensorVal;
@@ -296,24 +300,42 @@ void StoreLightSensorValue(int pos) {
 }
 
 // Go in the direction with the brightest light
-void ChoosePath() {
+void FindBrightestPath() {
+  int minimumLight = LightSensorValues[0];
+  int minimumPosition = 0;
+  
   // Find the brightest direction
-  int minimum = LightSensorValues[0];
   for (int i = 0; i < NUM_POSITIONS; i++) {
-    if (LightSensorValues[i] < minimum) {
-      minimum = LightSensorValues[i];
+    if (LightSensorValues[i] < minimumLight) {
+      minimumLight= LightSensorValues[i];
+      minimumPosition = i;
     }
   }
-
-  switch (minimum) {
-    case 0:  // Brightest direction is on the right
-      break;
-    case 1:  // Brightest direction is 
-      break;
-    case 2:  // Brightest direction is 
-      break;
-    case 3:  // Brightest direction is on the left
-      break;
+  
+  if (minimumLight < FOLLOW_THRESHOLD) {
+    switch (minimumPosition) {
+      case 0:  // Brightest direction is on the right
+        //Serial.println("Brightest direction is on the right");
+        spin_left(1);
+        STEP_FORWARD()
+        break;
+      case 1:  // Brightest direction is on the middle-right
+        //Serial.println("Brightest direction is on the middle-right");
+        STEP_FORWARD()
+        break;
+      case 2:  // Brightest direction is on the middle-left
+        //Serial.println("Brightest direction is on the middle-left");
+         STEP_FORWARD()
+        break;
+      case 3:  // Brightest direction is on the left
+        //Serial.println("Brightest direction is on the left");
+        spin_right(1);
+        STEP_FORWARD()
+        break;
+    }
+  }
+  else {
+    STEP_FORWARD()
   }
 }
 
@@ -322,12 +344,12 @@ boolean isCandlePresent() {
   LightSensorVal = analogRead(LightSensorPin);
 
   if (LightSensorVal < LIGHT_THRESHOLD) {
-    Serial.print("Candle is present: ");
-    Serial.println(LightSensorVal);
+    //Serial.print("Candle is present: ");
+    //Serial.println(LightSensorVal);
     return true;
   }
-  Serial.print("No candle present: ");
-  Serial.println(LightSensorVal);
+  //Serial.print("No candle present: ");
+  //Serial.println(LightSensorVal);
   return false;
 }
 
@@ -356,54 +378,57 @@ void keyscan() {
 void loop() {
   keyscan(); // Press the button to start
   while (true) {
-    // Object avoidance code
-    int servoPosition = 0;         // Tracks servo position
-    for (int i = INIT_POSITION; i <= FINAL_POSITION; i += 375){
-      servo.write(i);
-      brake();
-      delay(100);
-      
-      EdgeCheck();
-      StoreLightSensorValue(servoPosition);
-      
-      if (isObjectInFront()) {     // There is an object in front of the robot.
-        if (i <= MIDDLE_POSITION){ // The sensor is facing the right.
-          spin_left(5);
+    if (!isCandlePresent()) {
+      //===============================================================================================
+      // Object avoidance code
+      //===============================================================================================
+      int servoPosition = 0;         // Tracks servo position
+      for (int i = INIT_POSITION; i <= FINAL_POSITION; i += 375){
+        servo.write(i);
+        brake();
+        delay(100);
+        
+        EdgeCheck();
+        StoreLightValue(servoPosition);
+        
+        if (isObjectInFront() && LightSensorVal > LIGHT_THRESHOLD + 50) { // There is an object in front of the robot.
+          if (i <= MIDDLE_POSITION){                                      // The sensor is facing the right.
+            spin_left(5);
+          }
+          else {
+            spin_right(5);                                                // The sensor is facing the left.
+          }
+          i = INIT_POSITION;                                              // Reset the servo position.
+          servoPosition = 0;                                              // Reset the position tracker.
         }
-        else {
-          spin_right(5);           // The sensor is facing the left.
-        }
-        i = INIT_POSITION;         // Reset the servo position.
-        servoPosition = 0;         // Reset the position tracker.
-        //ChoosePath();
+        servoPosition++;
       }
-      servoPosition++;
+      
+      //===============================================================================================
+      // Black line following code
+      //===============================================================================================
+      EdgeRightDistanceTest(); // Measuring right ultrasonic distance
+      EdgeLeftDistanceTest();  // Measuring left ultrasonic distance
+      
+      SL = digitalRead(IRSensorLeft);  // Read left IR sensor state
+      SR = digitalRead(IRSensorRight); // Read right IR sensor state
+      if (SL == LOW && SR == LOW && isOnPlatform) {        // No black lines detected
+        FindBrightestPath();
+      }
+      else if (SL == LOW && SR == HIGH) {                  // Black line detected on the right, turn right
+        right();
+      }
+      else if (SL == HIGH && SR == LOW) {                  // Black line detected on the left, turn left
+        spin_left(1);
+      }
+      else if (SL == HIGH && SR == HIGH && isOnPlatform) { // Black line detected on both left and right, turn right
+        spin_left(3);
+      }
+  
+      //===============================================================================================
+      // Edge detection
+      //===============================================================================================
+      EdgeCheck();
     }
-    
-    // Black line following code
-    EdgeRightDistanceTest(); // Measuring right ultrasonic distance
-    EdgeLeftDistanceTest();  // Measuring left ultrasonic distance
-    
-    SL = digitalRead(IRSensorLeft);  // Read left IR sensor state
-    SR = digitalRead(IRSensorRight); // Read right IR sensor state
-    if (SL == LOW && SR == LOW && isOnPlatform) {        // No black lines detected
-      run();
-      delay(60);
-      brake();
-      delay(100);
-    }
-    else if (SL == LOW && SR == HIGH) {                  // Black line detected on the right, turn right
-      right();
-    }
-    else if (SL == HIGH && SR == LOW) {                  // Black line detected on the left, turn left
-      spin_left(1);
-    }
-    else if (SL == HIGH && SR == HIGH && isOnPlatform) { // Black line detected on both left and right, turn right
-      spin_left(3);
-    }
-
-    // Edge detection
-    EdgeCheck();
   }
-
 }
