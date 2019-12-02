@@ -48,9 +48,9 @@ ServoTimer2 servo;  // Servo var
 //=========================================================
 // IR sensor variables
 //=========================================================
-const int IRSensorRight = 1;  // IR sensor right port (D1)
-const int IRSensorMid   = 3;  // IR sensor mid port (D3)
-const int IRSensorLeft  = 11; // IR sensor left port (D11)
+const int IRSensorRight = 1;  // IR sensor right port  (D1)
+const int IRSensorMid   = 3;  // IR sensor middle port (D3)
+const int IRSensorLeft  = 11; // IR sensor left port  (D11)
 int SL, SM, SR;               // IR sensor states
 
 //=========================================================
@@ -208,7 +208,7 @@ void ObjectRightDistanceTest() {
   Fdistance= Fdistance/58;                          // Distance(m) =(time(s) * 344(m/s)) / 2     /****** The speed of sound is 344m/s.*******/
                                                     //  ==> 2*Distance(cm) = time(μs) * 0.0344(cm/μs)
                                                     //  ==> Distance(cm) = time(μs) * 0.0172 = time(μs) / 58
-  //Serial.print("Object right Distance:");             // Output Distance(cm)
+  //Serial.print("Object right Distance:");           // Output Distance(cm)
   //Serial.println(Fdistance);                        // Display distance
   ObjectRightDist = Fdistance;
 }  
