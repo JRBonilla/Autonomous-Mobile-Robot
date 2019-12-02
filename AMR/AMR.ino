@@ -1,7 +1,5 @@
 #include <ServoTimer2.h>
 
-#define STEP_FORWARD() run(); delay(60); brake(); delay(100);
-
 //========================================================
 // Constant variables
 //========================================================
@@ -11,11 +9,6 @@ const int FOLLOW_THRESHOLD = 750;
 const int MAX_DISTANCE     = 11;
 const int MAX_HEIGHT       = 20;
 const int MAX_SPEED        = 128;
-
-const int INIT_POSITION    = 375;
-const int FINAL_POSITION   = 1925;
-const int MIDDLE_POSITION  = 1500;
-const int NUM_POSITIONS    = 4;
 
 //========================================================
 // Motor & other variables
@@ -32,38 +25,33 @@ int right_motor_go   = 6;  // Pin D6
 int right_motor_en   = 5;  // Pin D5
 
 //=========================================================
-// Ultrasonic edge detection and object avoidance variables
+// Ultrasonic object avoidance variables
 //=========================================================
-int EdgeRightEcho = A1; // Set right Echo port
-int EdgeRightTrig = 4;  // Set right Trig port
-int EdgeRightDist = 0;
+int ObjectRightEcho = A1; // Set right Echo port
+int ObjectRightTrig = 4;  // Set right Trig port
+int ObjectRightDist = 0;
 
-int EdgeLeftEcho = A5;  // Set left Echo port
-int EdgeLeftTrig = A4;  // Set left Trig port
-int EdgeLeftDist = 0;
+int ObjectLeftEcho = A5;  // Set left Echo port
+int ObjectLeftTrig = A4;  // Set left Trig port
+int ObjectLeftDist = 0;
 
-int AvoidEcho = A2;     // Set front facing echo port
-int AvoidTrig = A3;     // Set front facing trig port
-int AvoidDist = 0;
-
-// Returns whether or not the edge sensors are currently off the edge.
-bool isLeftOOB    = (EdgeRightDist < MAX_HEIGHT && EdgeLeftDist > MAX_HEIGHT); // Left sensor out of bounds
-bool isRightOOB   = (EdgeRightDist > MAX_HEIGHT && EdgeLeftDist < MAX_HEIGHT); // Right sensor out of bounds
-bool isBothOOB    = (EdgeRightDist > MAX_HEIGHT && EdgeLeftDist > MAX_HEIGHT); // Both sensors out of bounds
-bool isOnPlatform = (EdgeRightDist < MAX_HEIGHT && EdgeLeftDist < MAX_HEIGHT); // Neither sensor out of bounds
+int ObjectMidEcho = A2;   // Set middle Echo port
+int ObjectMidTrig = A3;   // Set middle Trig port
+int ObjectMidDist = 0;
 
 //=========================================================
 // Servo variables
 //=========================================================
 int ServoPort = 0;  // Servo port
-ServoTimer2 servo;  // Servo
+ServoTimer2 servo;  // Servo var
 
 //=========================================================
 // IR sensor variables
 //=========================================================
 const int IRSensorRight = 1;  // IR sensor right port (D1)
+const int IRSensorMid   = 3;  // IR sensor mid port (D3)
 const int IRSensorLeft  = 11; // IR sensor left port (D11)
-int SL, SR;                   // IR sensor states
+int SL, SM, SR;               // IR sensor states
 
 //=========================================================
 // Light sensor variables
@@ -75,7 +63,7 @@ int LightSensorValues[NUM_POSITIONS] = {}; // Light sensor values for the differ
 // Initial setup code
 void setup() {
   // Begin serial output
-  //Serial.begin(9600); // Do not uncomment this unless you want debugging and aren't using D0 and/or D1
+  Serial.begin(9600); // Do not uncomment this unless you want debugging and aren't using D0 and/or D1
   
   // Initialize left and right motor drive for output mode.
   pinMode(left_motor_go,    OUTPUT);
@@ -85,27 +73,28 @@ void setup() {
   pinMode(right_motor_en,   OUTPUT);
   pinMode(left_motor_en,    OUTPUT);
 
-  pinMode(buttonPin, INPUT);       // Set button as input
-  //pinMode(beep, OUTPUT);         // Set buzzer as output
+  pinMode(buttonPin, INPUT);        // Set button as input
+  //pinMode(beep, OUTPUT);          // Set buzzer as output
 
-  pinMode(LightSensorPin, INPUT);  // Set light sensor as input
+  pinMode(LightSensorPin, INPUT);   // Set light sensor as input
 
-  pinMode(EdgeRightEcho, INPUT);   // Set Echo port mode
-  pinMode(EdgeRightTrig, OUTPUT);  // Set Trig port mode
+  pinMode(ObjectRightEcho, INPUT);  // Set Echo port mode
+  pinMode(ObjectRightTrig, OUTPUT); // Set Trig port mode
 
-  pinMode(EdgeLeftEcho, INPUT);    // Set Echo port mode
-  pinMode(EdgeLeftTrig, OUTPUT);   // Set Trig port mode
+  pinMode(ObjectLeftEcho, INPUT);   // Set Echo port mode
+  pinMode(ObjectLeftTrig, OUTPUT);  // Set Trig port mode
 
-  pinMode(AvoidEcho, INPUT);       // Set Echo port mode
-  pinMode(AvoidTrig, OUTPUT);      // Set Trig port mode
+  pinMode(ObjectMidEcho, INPUT);    // Set Echo port mode
+  pinMode(ObjectMidTrig, OUTPUT);   // Set Trig port mode
 
-  servo.attach(ServoPort);         // Attach the servo to the servo port
+  servo.attach(ServoPort);          // Attach the servo to the servo port
 
-  digitalWrite(buttonPin, HIGH);   // Initialize button
-  //digitalWrite(buzzerPin, LOW);  // Set buzzer mute
+  digitalWrite(buttonPin, HIGH);    // Initialize button
+  //digitalWrite(buzzerPin, LOW);   // Set buzzer mute
 
-  pinMode(IRSensorRight, INPUT);   // Set right Line Walking IR sensor as input
-  pinMode(IRSensorLeft,  INPUT);   // Set left Line Walking IR sensor as input
+  pinMode(IRSensorRight, INPUT);    // Set right Line Walking IR sensor as input
+  pinMode(IRSensorLeft,  INPUT);    // Set left Line Walking IR sensor as input
+  pinMode(IRSensorMid,   INPUT);    // Set middle Line Walking IR sensor as input
 }
 
 // Move forward
@@ -209,86 +198,51 @@ void back(int time) {
 }
 
 // Right ultrasonic sensor distance test
-void EdgeRightDistanceTest() {
-  digitalWrite(EdgeRightTrig, LOW);               // Set trig port low level for 2μs
+void ObjectRightDistanceTest() {
+  digitalWrite(ObjectRightTrig, LOW);               // Set trig port low level for 2μs
   delayMicroseconds(2);
-  digitalWrite(EdgeRightTrig, HIGH);              // Set trig port high level for 10μs(at least 10μs)
+  digitalWrite(ObjectRightTrig, HIGH);              // Set trig port high level for 10μs(at least 10μs)
   delayMicroseconds(10);
-  digitalWrite(EdgeRightTrig, LOW);               // Set trig port low level
-  float Fdistance = pulseIn(EdgeRightEcho, HIGH); // Read echo port high level time(unit:μs)
-  Fdistance= Fdistance/58;                        // Distance(m) =(time(s) * 344(m/s)) / 2     /****** The speed of sound is 344m/s.*******/
-                                                  //  ==> 2*Distance(cm) = time(μs) * 0.0344(cm/μs)
-                                                  //  ==> Distance(cm) = time(μs) * 0.0172 = time(μs) / 58
-  //Serial.print("Edge right Distance:");           // Output Distance(cm)
-  //Serial.println(Fdistance);                      // Display distance
-  EdgeRightDist = Fdistance;
+  digitalWrite(ObjectRightTrig, LOW);               // Set trig port low level
+  float Fdistance = pulseIn(ObjectRightEcho, HIGH); // Read echo port high level time(unit:μs)
+  Fdistance= Fdistance/58;                          // Distance(m) =(time(s) * 344(m/s)) / 2     /****** The speed of sound is 344m/s.*******/
+                                                    //  ==> 2*Distance(cm) = time(μs) * 0.0344(cm/μs)
+                                                    //  ==> Distance(cm) = time(μs) * 0.0172 = time(μs) / 58
+  //Serial.print("Object right Distance:");             // Output Distance(cm)
+  //Serial.println(Fdistance);                        // Display distance
+  ObjectRightDist = Fdistance;
 }  
 
 // Left ultrasonic sensor distance test
-void EdgeLeftDistanceTest() {
-  digitalWrite(EdgeLeftTrig, LOW);               // Set trig port low level for 2μs
+void ObjectLeftDistanceTest() {
+  digitalWrite(ObjectLeftTrig, LOW);               // Set trig port low level for 2μs
   delayMicroseconds(2);
-  digitalWrite(EdgeLeftTrig, HIGH);              // Set trig port high level for 10μs(at least 10μs)
+  digitalWrite(ObjectLeftTrig, HIGH);              // Set trig port high level for 10μs(at least 10μs)
   delayMicroseconds(10);
-  digitalWrite(EdgeLeftTrig, LOW);               // Set trig port low level
-  float Fdistance = pulseIn(EdgeLeftEcho, HIGH); // Read echo port high level time(unit:μs)
-  Fdistance= Fdistance/58;                       // Distance(m) =(time(s) * 344(m/s)) / 2     /****** The speed of sound is 344m/s.*******/
-                                                 //  ==> 2*Distance(cm) = time(μs) * 0.0344(cm/μs)
-                                                 //  ==> Distance(cm) = time(μs) * 0.0172 = time(μs) / 58
-  //Serial.print("Edge left Distance:");           // Output Distance(cm)
-  //Serial.println(Fdistance);                     // Display distance
-  EdgeLeftDist = Fdistance;
+  digitalWrite(ObjectLeftTrig, LOW);               // Set trig port low level
+  float Fdistance = pulseIn(ObjectLeftEcho, HIGH); // Read echo port high level time(unit:μs)
+  Fdistance= Fdistance/58;                         // Distance(m) =(time(s) * 344(m/s)) / 2     /****** The speed of sound is 344m/s.*******/
+                                                   //  ==> 2*Distance(cm) = time(μs) * 0.0344(cm/μs)
+                                                   //  ==> Distance(cm) = time(μs) * 0.0172 = time(μs) / 58
+  //Serial.print("Object left Distance:");           // Output Distance(cm)
+  //Serial.println(Fdistance);                       // Display distance
+  ObjectLeftDist = Fdistance;
 }  
 
-// Object avoidance sensor distance test
-void AvoidDistanceTest() {
-  digitalWrite(AvoidTrig, LOW);               // Set trig port low level for 2μs
+// Middle ultrasonic sensor distance test
+void ObjectMidDistanceTest() {
+  digitalWrite(ObjectMidTrig, LOW);               // Set trig port low level for 2μs
   delayMicroseconds(2);
-  digitalWrite(AvoidTrig, HIGH);              // Set trig port high level for 10μs(at least 10μs)
+  digitalWrite(ObjectMidTrig, HIGH);              // Set trig port high level for 10μs(at least 10μs)
   delayMicroseconds(10);
-  digitalWrite(AvoidTrig, LOW);               // Set trig port low level
-  float Fdistance = pulseIn(AvoidEcho, HIGH); // Read echo port high level time(unit:μs)
-  Fdistance= Fdistance/58;                    // Distance(m) =(time(s) * 344(m/s)) / 2     /****** The speed of sound is 344m/s.*******/
-                                              //  ==> 2*Distance(cm) = time(μs) * 0.0344(cm/μs)
-                                              //  ==> Distance(cm) = time(μs) * 0.0172 = time(μs) / 58
-  //Serial.print("Avoid Distance:");            // Output Distance(cm)
-  //Serial.println(Fdistance);                  // Display distance
-  AvoidDist = Fdistance;
-}
-
-// Returns whether or not the object avoidance sensor detected an object
-boolean isObjectInFront(){
-    AvoidDistanceTest(); // Check the avoidance sensor distance once.
-
-    int old = AvoidDist; // Save the prior result and wait 250 ms before the next test.
-    delay(250);
-    
-    AvoidDistanceTest(); // Check the avoidance sensor distance again.
-    
-    // If both checks are less than MAX_DISTANCE then there is something in front
-    if (AvoidDist < MAX_DISTANCE && old < MAX_DISTANCE ) {
-      return true;
-    }
-    return false;
-}
-
-// Edge detection code
-void EdgeCheck(){
-    EdgeRightDistanceTest(); // Measuring right ultrasonic distance
-    EdgeLeftDistanceTest();  // Measuring left ultrasonic distance
-    
-    if (EdgeRightDist > MAX_HEIGHT && EdgeLeftDist > MAX_HEIGHT) {  // Both are out of bounds
-      back(2);
-      spin_right(6);
-    }
-    if (EdgeRightDist < MAX_HEIGHT && EdgeLeftDist > MAX_HEIGHT) {  // Right is out of bounds
-      back(2);
-      spin_left(6);
-    }
-    if (EdgeRightDist > MAX_HEIGHT && EdgeLeftDist < MAX_HEIGHT) {  // Left is out of bounds
-      back(2);
-      spin_right(6);
-    }
+  digitalWrite(ObjectMidTrig, LOW);               // Set trig port low level
+  float Fdistance = pulseIn(ObjectMidEcho, HIGH); // Read echo port high level time(unit:μs)
+  Fdistance= Fdistance/58;                        // Distance(m) =(time(s) * 344(m/s)) / 2     /****** The speed of sound is 344m/s.*******/
+                                                  //  ==> 2*Distance(cm) = time(μs) * 0.0344(cm/μs)
+                                                  //  ==> Distance(cm) = time(μs) * 0.0172 = time(μs) / 58
+  //Serial.print("Object middle Distance:");        // Output Distance(cm)
+  //Serial.println(Fdistance);                      // Display distance
+  ObjectMidDist = Fdistance;
 }
 
 // Store the light sensor value based on the current servo position.
@@ -296,46 +250,6 @@ void StoreLightValue(int pos) {
   LightSensorVal = analogRead(LightSensorPin);
   if (pos < NUM_POSITIONS) {
     LightSensorValues[pos] = LightSensorVal;
-  }
-}
-
-// Go in the direction with the brightest light
-void FindBrightestPath() {
-  int minimumLight = LightSensorValues[0];
-  int minimumPosition = 0;
-  
-  // Find the brightest direction
-  for (int i = 0; i < NUM_POSITIONS; i++) {
-    if (LightSensorValues[i] < minimumLight) {
-      minimumLight= LightSensorValues[i];
-      minimumPosition = i;
-    }
-  }
-  
-  if (minimumLight < FOLLOW_THRESHOLD) {
-    switch (minimumPosition) {
-      case 0:  // Brightest direction is on the right
-        //Serial.println("Brightest direction is on the right");
-        spin_left(1);
-        STEP_FORWARD()
-        break;
-      case 1:  // Brightest direction is on the middle-right
-        //Serial.println("Brightest direction is on the middle-right");
-        STEP_FORWARD()
-        break;
-      case 2:  // Brightest direction is on the middle-left
-        //Serial.println("Brightest direction is on the middle-left");
-         STEP_FORWARD()
-        break;
-      case 3:  // Brightest direction is on the left
-        //Serial.println("Brightest direction is on the left");
-        spin_right(1);
-        STEP_FORWARD()
-        break;
-    }
-  }
-  else {
-    STEP_FORWARD()
   }
 }
 
@@ -378,57 +292,12 @@ void keyscan() {
 void loop() {
   keyscan(); // Press the button to start
   while (true) {
-    if (!isCandlePresent()) {
-      //===============================================================================================
-      // Object avoidance code
-      //===============================================================================================
-      int servoPosition = 0;         // Tracks servo position
-      for (int i = INIT_POSITION; i <= FINAL_POSITION; i += 375){
-        servo.write(i);
-        brake();
-        delay(100);
-        
-        EdgeCheck();
-        StoreLightValue(servoPosition);
-        
-        if (isObjectInFront() && LightSensorVal > LIGHT_THRESHOLD + 50) { // There is an object in front of the robot.
-          if (i <= MIDDLE_POSITION){                                      // The sensor is facing the right.
-            spin_left(5);
-          }
-          else {
-            spin_right(5);                                                // The sensor is facing the left.
-          }
-          i = INIT_POSITION;                                              // Reset the servo position.
-          servoPosition = 0;                                              // Reset the position tracker.
-        }
-        servoPosition++;
-      }
-      
-      //===============================================================================================
-      // Black line following code
-      //===============================================================================================
-      EdgeRightDistanceTest(); // Measuring right ultrasonic distance
-      EdgeLeftDistanceTest();  // Measuring left ultrasonic distance
-      
-      SL = digitalRead(IRSensorLeft);  // Read left IR sensor state
-      SR = digitalRead(IRSensorRight); // Read right IR sensor state
-      if (SL == LOW && SR == LOW && isOnPlatform) {        // No black lines detected
-        FindBrightestPath();
-      }
-      else if (SL == LOW && SR == HIGH) {                  // Black line detected on the right, turn right
-        right();
-      }
-      else if (SL == HIGH && SR == LOW) {                  // Black line detected on the left, turn left
-        spin_left(1);
-      }
-      else if (SL == HIGH && SR == HIGH && isOnPlatform) { // Black line detected on both left and right, turn right
-        spin_left(3);
-      }
-  
-      //===============================================================================================
-      // Edge detection
-      //===============================================================================================
-      EdgeCheck();
+    SM = digitalRead(IRSensorMid);
+    if (SM == LOW) {
+      Serial.println("LOW");
+    }
+    else {
+      Serial.println("HIGH");
     }
   }
 }
