@@ -5,10 +5,13 @@
 //========================================================
 const int LIGHT_THRESHOLD  = 570;
 const int FOLLOW_THRESHOLD = 750;
-const int NUM_POSITIONS = 1;
+
+const int NUM_POSITIONS    = 1;
+const int LINE_THRESHOLD   = 200;
+
 const int MAX_DISTANCE     = 11;
-const int MAX_HEIGHT       = 20;
-const int MAX_SPEED        = 128;
+const int MAX_GO_SPEED     = 100;
+const int MAX_SPIN_SPEED   = 128;
 
 //========================================================
 // Motor & other variables
@@ -16,13 +19,13 @@ const int MAX_SPEED        = 128;
 int buttonPin        = 13; // Pin D13
 int buzzerPin        = 12; // Pin D12
 
-int left_motor_en    = 10; // Pin D10
-int left_motor_back  = 9;  // Pin D9
-int left_motor_go    = 8;  // Pin D8
+int left_motor_en    = 10; // Pin D10, ENA
+int left_motor_back  = 9;  // Pin D9,  IN1
+int left_motor_go    = 8;  // Pin D8,  IN2
 
-int right_motor_back = 7;  // Pin D7
-int right_motor_go   = 6;  // Pin D6
-int right_motor_en   = 5;  // Pin D5
+int right_motor_back = 7;  // Pin D7,  IN3
+int right_motor_go   = 6;  // Pin D6,  IN4
+int right_motor_en   = 5;  // Pin D5,  ENB
 
 //=========================================================
 // Ultrasonic object avoidance variables
@@ -49,8 +52,8 @@ ServoTimer2 servo;  // Servo var
 // IR sensor variables
 //=========================================================
 const int IRSensorRight = 1;  // IR sensor right port  (D1)
-const int IRSensorMid   = 11;  // IR sensor middle port (D11)
-const int IRSensorLeft  = 3; // IR sensor left port  (D3)
+const int IRSensorMid   = A4; // IR sensor middle port (A4)
+const int IRSensorLeft  = 3;  // IR sensor left port   (D3)
 int SL, SM, SR;               // IR sensor states
 
 //=========================================================
@@ -63,7 +66,6 @@ int LightSensorValues[NUM_POSITIONS] = {}; // Light sensor values for the differ
 // Initial setup code
 void setup() {
   // Begin serial output
-  //
   //Serial.begin(9600); // Do not uncomment this unless you want debugging and aren't using D0 and/or D1
   
   // Initialize left and right motor drive for output mode.
@@ -100,19 +102,13 @@ void setup() {
 
 // Move forward
 void run() {
-  digitalWrite(left_motor_en, HIGH);   // Left motor enable
-  analogWrite(left_motor_en, 130);
-  digitalWrite(right_motor_en, HIGH);  // Right motor enable
-
-  digitalWrite(right_motor_go, HIGH);  // Right motor go ahead
-  digitalWrite(right_motor_back, LOW);
-  analogWrite(right_motor_go, 130);    // PWM--Pulse Width Modulation (0~255). right motor go speed is 130
-  analogWrite(right_motor_back, 0);
-
-  digitalWrite(left_motor_go, HIGH);   // Left motor go ahead
   digitalWrite(left_motor_back, LOW);
-  analogWrite(left_motor_go, 130);     // PWM--Pulse Width Modulation (0~255). left motor go speed is 130
-  analogWrite(left_motor_back, 0);
+  digitalWrite(left_motor_go,  HIGH);
+  analogWrite(left_motor_en, MAX_GO_SPEED);
+
+  digitalWrite(right_motor_back, LOW);
+  digitalWrite(right_motor_go,  HIGH);
+  analogWrite(right_motor_en, MAX_GO_SPEED);
 }
 
 // Stop
@@ -126,74 +122,60 @@ void brake() {
 
 // Turn left
 void left() {
-  digitalWrite(right_motor_go, HIGH);  // Right motor go ahead
+  digitalWrite(left_motor_back, LOW);
+  digitalWrite(left_motor_go,   LOW);
+  analogWrite(left_motor_en, 0);
+
   digitalWrite(right_motor_back, LOW);
-  analogWrite(right_motor_go, 190);    // PWM--Pulse Width Modulation(0~255) control speed，right motor go speed is 190.
-  analogWrite(right_motor_back, 0);
-  
-  digitalWrite(left_motor_go, LOW);    // Left motor stop
-  digitalWrite(left_motor_back, LOW); 
-  analogWrite(left_motor_go, 0); 
-  analogWrite(left_motor_back, 0);
-  delay(150); 
+  digitalWrite(right_motor_go,  HIGH);
+  analogWrite(right_motor_en, MAX_GO_SPEED);
 }
 
 // Rotate left
 void spin_left(int time) {
-  digitalWrite(right_motor_go,  HIGH);     // Right motor go ahead
-  digitalWrite(right_motor_back, LOW);
-  analogWrite(right_motor_go, MAX_SPEED);  // PWM--Pulse Width Modulation(0~255) control speed, right motor go speed is 200
-  analogWrite(right_motor_back, 0);
-
-  digitalWrite(left_motor_go,   LOW);      // Left motor back off
   digitalWrite(left_motor_back, HIGH);
-  analogWrite(left_motor_go, 0);
-  analogWrite(left_motor_back, MAX_SPEED); // PWM--Pulse Width Modulation(0~255) control speed, left motor back speed is 200.
+  digitalWrite(left_motor_go,    LOW);
+  analogWrite(left_motor_en, MAX_SPIN_SPEED);
 
+  digitalWrite(right_motor_back, LOW);
+  digitalWrite(right_motor_go,  HIGH);
+  analogWrite(right_motor_en, MAX_SPIN_SPEED);
   delay(time * 100);
 }
 
 // Turn right
 void right() {
-  digitalWrite(right_motor_go, LOW);   // Right motor stop
-  digitalWrite(right_motor_back, LOW);
-  analogWrite(right_motor_go, 0); 
-  analogWrite(right_motor_back, 0);
-  
-  digitalWrite(left_motor_go, HIGH);   // Left motor go ahead
   digitalWrite(left_motor_back, LOW);
-  analogWrite(left_motor_go, 230);     // PWM--Pulse Width Modulation(0~255) control speed ,left motor go speed is 230.
-  analogWrite(left_motor_back, 0);
-  delay(150);
+  digitalWrite(left_motor_go,  HIGH);
+  analogWrite(left_motor_en, MAX_GO_SPEED);
+
+  digitalWrite(right_motor_back, LOW);
+  digitalWrite(right_motor_go,   LOW);
+  analogWrite(right_motor_en, 0);
 }
 
 // Rotate right
 void spin_right(int time) {
-  digitalWrite(right_motor_go,    LOW);     // Right motor back off
-  digitalWrite(right_motor_back, HIGH);
-  analogWrite(right_motor_go, 0);
-  analogWrite(right_motor_back, MAX_SPEED); // PWM--Pulse Width Modulation(0~255) control speed
-
-  digitalWrite(left_motor_go,  HIGH);       // Left motor go ahead
   digitalWrite(left_motor_back, LOW);
-  analogWrite(left_motor_go, MAX_SPEED);    // PWM--Pulse Width Modulation(0~255) control speed
-  analogWrite(left_motor_back, 0);
+  digitalWrite(left_motor_go,  HIGH);
+  analogWrite(left_motor_en, MAX_SPIN_SPEED);
+
+  digitalWrite(right_motor_back, HIGH);
+  digitalWrite(right_motor_go,    LOW);
+  analogWrite(right_motor_en, MAX_SPIN_SPEED);
 
   delay(time * 100);
 }
 
 // Go backwards
 void back(int time) {
-  digitalWrite(right_motor_go,    LOW);     // Right motor back off
-  digitalWrite(right_motor_back, HIGH);
-  analogWrite(right_motor_go, 0);
-  analogWrite(right_motor_back, MAX_SPEED); // PWM--Pulse Width Modulation(0~255) control speed
-  analogWrite(right_motor_en, 200);
-
-  digitalWrite(left_motor_go,    LOW);      // Left motor back off
   digitalWrite(left_motor_back, HIGH);
-  analogWrite(left_motor_go, 0);
-  analogWrite(left_motor_back, MAX_SPEED);  // PWM--Pulse Width Modulation(0~255) control speed
+  digitalWrite(left_motor_go,    LOW);
+  analogWrite(left_motor_en, MAX_GO_SPEED);
+
+  digitalWrite(right_motor_back, HIGH);
+  digitalWrite(right_motor_go,    LOW);
+  analogWrite(right_motor_en, MAX_GO_SPEED);
 
   delay(time * 100);
 }
@@ -290,31 +272,28 @@ void keyscan() {
   }
 }
 
-int startX[]  = {4,4,0};
-int startY[] = {0,2,0};
-
+int startX[] = {4, 4, 0};
+int startY[] = {0, 2, 0};
 int startPos = 1;
 
 int ballPos[12][2] = {{1,2}, {2,1}, {3,2},
-                       {1,1}, {2,1}, {3,1},
-                       {1,1}, {2,1}, {3,1},
-                       {1,1}, {2,2}, {3,3}};
+                      {1,1}, {2,1}, {3,1},
+                      {1,1}, {2,1}, {3,1},
+                      {1,1}, {2,2}, {3,3}};
 
-int upDown[] = {1,1,1,0,0,0,1,1,1,0,0,0};
+int upDown[] = { 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0 };
 
-int posWithBall[] = {1,2,3,4,5,6};
+int posWithBall[] = { 1, 2, 3, 4, 5, 6 };
 int currX = 0;
 int currY = 0;
 
 int startingAxis[] = {1,1,1};
-// 0  means its moving in X axis, 1 means Y;
-int currAxis = 0;
+int currAxis = 0;      // 0  means its moving in X axis, 1 means Y;
 
 int startingDirection[] = {0,0,1};
-// 0 means goings forward, 1 means going back.
-int currDirection = 0;
+int currDirection = 0; // 0 means goings forward, 1 means going back.
 
-void updatePos(){
+void updatePos() {
   if (currAxis == 0) {
     if (currDirection == 0) currX += 1;
     if (currDirection == 1) currX -= 1;
@@ -326,10 +305,11 @@ void updatePos(){
   }
 }
 
-void rotateX(){
-      SM = digitalRead(IRSensorMid);
-      SR = digitalRead(IRSensorRight);
-      SL = digitalRead(IRSensorLeft);
+void rotateX() {
+  SM = analogRead(IRSensorMid);
+  SR = digitalRead(IRSensorRight);
+  SL = digitalRead(IRSensorLeft);
+  
   if (currX == 0) {
     if (currDirection == 1){
       rotateLeft();
@@ -352,96 +332,88 @@ void rotateX(){
 
   currAxis = 0;
 }
-void rotateY(){
 
-      SM = digitalRead(IRSensorMid);
-      SR = digitalRead(IRSensorRight);
-      SL = digitalRead(IRSensorLeft);
+void rotateY() {
+  SM = analogRead(IRSensorMid);
+  SR = digitalRead(IRSensorRight);
+  SL = digitalRead(IRSensorLeft);
+
   if (currY == 2){
-
     if (currDirection == 1) {
       rotateLeft();
     } else {
       rotateRight();
     }
-    
-   currDirection = 1;
+    currDirection = 1;
   }
 
   if (currY == 0){
-
     if (currDirection == 0) {
       rotateLeft();
     } else {
       rotateRight();
     }
-    
-   currDirection = 1;
+    currDirection = 1;
   }
 
-      currAxis = 1;
-      brake();
+  currAxis = 1;
+  brake();
 }
 
-
-void takeXStep(){
-  
-      SM = digitalRead(IRSensorMid);
-      SR = digitalRead(IRSensorRight);
-      SL = digitalRead(IRSensorLeft);
+void takeXStep() {
+  SM = analogRead(IRSensorMid);
+  SR = digitalRead(IRSensorRight);
+  SL = digitalRead(IRSensorLeft);
       
-     boolean takeStep = true;
-
-     if (SM == LOW && SR == LOW && SL == LOW) takeStep = false;
+  boolean takeStep = true;
+  
+  if (SM < LINE_THRESHOLD && SR == LOW && SL == LOW) takeStep = false;
      
-     while (takeStep) {
-        
-      SM = digitalRead(IRSensorMid);
-      SR = digitalRead(IRSensorRight);
-      SL = digitalRead(IRSensorLeft);
-      if (SL ==LOW &&SR== LOW)// Black lines were not detected at the same time
-        run();   // go ahead
-      else if (SL == LOW & SR == HIGH)// Left sensor against white undersurface and right against black undersurface , the car left off track and need to adjust to the right.
-          right();
-      else if (SR == LOW & SL ==  HIGH) // Rihgt sensor against white undersurface and left against black undersurface , the car right off track and need to adjust to the left.
-        left();
+  while (takeStep) {      
+    SM = analogRead(IRSensorMid);
+    SR = digitalRead(IRSensorRight);
+    SL = digitalRead(IRSensorLeft);
+    if (SL == LOW && SR == LOW)       // Black lines were not detected at the same time
+      run();   // go ahead
+    else if (SL == LOW & SR == HIGH)  // Left sensor against white undersurface and right against black undersurface , the car left off track and need to adjust to the right.
+      right();
+    else if (SR == LOW & SL ==  HIGH) // Rihgt sensor against white undersurface and left against black undersurface , the car right off track and need to adjust to the left.
+      left();
 
         
-      SM = digitalRead(IRSensorMid);
-      SR = digitalRead(IRSensorRight);
-      SL = digitalRead(IRSensorLeft);
-     // Serial.println("m r l ;");
-     //Serial.println(SM);
-     //Serial.println(SR);
-     //Serial.println(SL);
-     if (SM == LOW && SR == LOW && SL == LOW) {
+    SM = analogRead(IRSensorMid);
+    SR = digitalRead(IRSensorRight);
+    SL = digitalRead(IRSensorLeft);
+    //Serial.println("m r l ;");
+    //Serial.println(SM);
+    //Serial.println(SR);
+    //Serial.println(SL);
+    if (SM < LINE_THRESHOLD && SR == LOW && SL == LOW) {
       brake();
       delay(500);
-      
-        if (SM == LOW && SR == LOW && SL == LOW) {
-            takeStep = false; break;
-        }
+      if (SM < LINE_THRESHOLD && SR == LOW && SL == LOW) {
+        takeStep = false; break;
       }
-     
-     
-     }
-     brake();
-     updatePos();
-     
-     delay(1000);
+    }     
+  }
+  brake();
+  updatePos();
+  
+  delay(1000);
 }
 
 
-void goTo(int pos){
+void goTo(int pos) {
   int targetPosX = ballPos[pos-1][0];
   int targetPosY = ballPos[pos-1][1];
 
   int diffX = targetPosX - currX;
   int diffY = targetPosY - currY;
+  
   boolean onLine = true;
   boolean doneX = false;
+  
   // Go to corner of layout
-
   if (currY != targetPosY) {
     if (currX == 0 || currX == 4) onLine = false;
     while(onLine){    
@@ -464,72 +436,74 @@ void goTo(int pos){
 
   // go to new x
   rotateX();
-    while (currX != targetPosX) {
-      takeXStep();
+  while (currX != targetPosX) {
+    takeXStep();
+  }
+}
+void rotateLeft() {
+  SM = analogRead(IRSensorMid);
+  SR = digitalRead(IRSensorRight);
+  SL = digitalRead(IRSensorLeft);
+
+  while (SM != HIGH || SL != LOW || SR != LOW  ) {      
+    SM = analogRead(IRSensorMid);
+    SR = digitalRead(IRSensorRight);
+    SL = digitalRead(IRSensorLeft);
+
+    run();
+    if (SL == LOW && SR == LOW) {        // Black lines were not detected at the same time
+      delay(20);
+      spin_left(1);                      // This makes it go left instead of right 
     }
- 
+    else if (SL == LOW && SR == HIGH) {  // Left sensor against white undersurface and right against black undersurface , the car left off track and need to adjust to the right.
+      spin_right(1);
+    }
+    else if (SR == LOW && SL ==  HIGH) { // Rihgt sensor against white undersurface and left against black undersurface , the car right off track and need to adjust to the left.
+      delay(20);
+      spin_left(1);
+    }
+    brake();
+    
+    if (SM == HIGH && SL == LOW && SR == LOW ) {
+      break;
+    }   
+  }
+  run();
+  spin_right(1);
+  brake();
+}
+
+void rotateRight() {
+  SM = analogRead(IRSensorMid);
+  SR = digitalRead(IRSensorRight);
+  SL = digitalRead(IRSensorLeft);
   
-}
-void rotateLeft(){
-   SM = digitalRead(IRSensorMid);
-   SR = digitalRead(IRSensorRight);
-   SL = digitalRead(IRSensorLeft);
-  while (SM != HIGH || SL != LOW || SR != LOW  ) {
-        
-      SM = digitalRead(IRSensorMid);
-      SR = digitalRead(IRSensorRight);
-      SL = digitalRead(IRSensorLeft);
-
-      run();
-      if (SL ==LOW &&SR== LOW)// Black lines were not detected at the same time
-        { delay(20);
-        spin_left(1);   // This makes it go left instead of right 
-        }else if (SL == LOW & SR == HIGH)// Left sensor against white undersurface and right against black undersurface , the car left off track and need to adjust to the right.
-          spin_right(1);
-      else if (SR == LOW & SL ==  HIGH) // Rihgt sensor against white undersurface and left against black undersurface , the car right off track and need to adjust to the left.
-      {
-        delay(20);
-        spin_left(1);
-      }
+  while (SM != HIGH || SL != LOW || SR != LOW  ) {  
+    SM = analogRead(IRSensorMid);
+    SR = digitalRead(IRSensorRight);
+    SL = digitalRead(IRSensorLeft);
+    
+    run();
+    if (SL == LOW && SR == LOW) {        // Black lines were not detected at the same time
+      delay(20);
+      spin_right(1);                     // This makes it go left instead of right
+    }
+    else if (SL == LOW && SR == HIGH) {  // Left sensor against white undersurface and right against black undersurface , the car left off track and need to adjust to the right.
+      spin_right(1);
+    }
+    else if (SR == LOW && SL ==  HIGH) { // Right sensor against white undersurface and left against black undersurface , the car right off track and need to adjust to the left.
+      delay(20);
+      spin_left(1);
+    }
     brake();
-    if (SM == HIGH && SL == LOW && SR == LOW ) break;
-     
-     
-     }
-     run();
-     spin_right(1);
-     brake();
-}
-
-void rotateRight(){
-   SM = digitalRead(IRSensorMid);
-   SR = digitalRead(IRSensorRight);
-   SL = digitalRead(IRSensorLeft);
-  while (SM != HIGH || SL != LOW || SR != LOW  ) {
-        
-      SM = digitalRead(IRSensorMid);
-      SR = digitalRead(IRSensorRight);
-      SL = digitalRead(IRSensorLeft);
-
-      run();
-      if (SL ==LOW &&SR== LOW)// Black lines were not detected at the same time
-        { delay(20);
-        spin_right(1);   // This makes it go left instead of right 
-        }else if (SL == LOW & SR == HIGH)// Left sensor against white undersurface and right against black undersurface , the car left off track and need to adjust to the right.
-          spin_right(1);
-      else if (SR == LOW & SL ==  HIGH) // Rihgt sensor against white undersurface and left against black undersurface , the car right off track and need to adjust to the left.
-      {
-        delay(20);
-        spin_left(1);
-      }
-    brake();
-    if (SM == HIGH && SL == LOW && SR == LOW ) break;
-     
-     
-     }
-     run();
-     spin_right(1);
-     brake();
+    
+    if (SM == HIGH && SL == LOW && SR == LOW ) {
+      break;
+    }
+  }
+  run();
+  spin_right(1);
+  brake();
 }
 
 void loop() {
@@ -537,19 +511,32 @@ void loop() {
 
   //currX = startX[startPos-1];
   //currY = startY[startPos-1];
+  
   currX = 2;
   currY = 2; 
   currAxis = 0;
   currDirection = 1;
+  
   //currAxis = startingAxis[startPos-1];
   //currDirection  = startingDirection[startPos-1];
+  
   while (true) {
     // IR Sensors
-    SM = digitalRead(IRSensorMid);
+    SM = analogRead(IRSensorMid);
     SR = digitalRead(IRSensorRight);
     SL = digitalRead(IRSensorLeft);
+
+    //takeXStep();
+    //return;
+
+    //Serial.print("Middle IR sensor: ");
+    //Serial.println(SM);
+
+    /*if (SM < LINE_THRESHOLD) {
+      Serial.println("OFF OF BLACK LINE");
+    }*/
+    
     goTo(10);
     return;
-    
   }
 }
